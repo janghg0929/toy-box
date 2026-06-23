@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>집에 가고 싶다</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    width:100vw;
+    height:100vh;
+    overflow:hidden;
+    background:
+        radial-gradient(
+            circle at center,
+            #1a2030 0%,
+            #090b12 100%
+        );
+    font-family:"맑은 고딕",sans-serif;
+}
+
+#screen{
+    width:100%;
+    height:100%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    flex-direction:column;
+}
+
+#text-container{
+    animation:pulse 3s ease-in-out infinite;
+}
+
+#text{
+    font-size:90px;
+    font-weight:900;
+    color:white;
+    user-select:none;
+    text-shadow:
+        0 0 10px rgba(255,255,255,.4);
+    transition:
+        color .3s,
+        font-size .3s,
+        text-shadow .3s;
+}
+
+#info{
+    position:fixed;
+    top:15px;
+    left:15px;
+    color:#bfc7d5;
+    font-size:18px;
+    line-height:1.6;
+    z-index:100;
+}
+
+#escape-meter{
+    position:fixed;
+    bottom:45px;
+    left:50%;
+    transform:translateX(-50%);
+    width:420px;
+    height:18px;
+    border-radius:20px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.2);
+    background:rgba(255,255,255,.05);
+}
+
+#escape-fill{
+    width:0%;
+    height:100%;
+    background:linear-gradient(
+        90deg,
+        #ffd166,
+        #ff9f43
+    );
+    transition:width .3s;
+}
+
+#escape-text{
+    position:fixed;
+    bottom:15px;
+    left:50%;
+    transform:translateX(-50%);
+    color:#d8dee9;
+    font-size:16px;
+}
+
+#wall{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    overflow:hidden;
+    white-space:pre-wrap;
+    line-height:1.5;
+    font-size:48px;
+    font-weight:bold;
+    color:rgba(255,255,255,.3);
+    text-shadow:
+        0 0 8px rgba(255,255,255,.5);
+    opacity:0;
+    transition:opacity 1s;
+}
+
+#frozen-time{
+    position:fixed;
+    top:20px;
+    right:20px;
+    font-size:24px;
+    font-family:monospace;
+    color:rgba(255,255,255,.5);
+    opacity:0;
+    transition:opacity 1s;
+}
+
+.house{
+    position:fixed;
+    pointer-events:none;
+    animation:floatUp 8s linear forwards;
+
+    opacity:.9;
+    color:white;
+
+    text-shadow:
+        0 0 10px rgba(255,255,255,.6),
+        0 0 20px rgba(255,255,255,.4);
+}
+
+@keyframes pulse{
+    0%,100%{
+        transform:scale(1);
+    }
+
+    50%{
+        transform:scale(1.04);
+    }
+}
+
+@keyframes floatUp{
+    from{
+        transform:translateY(0);
+        opacity:0;
+    }
+
+    15%{
+        opacity:.9;
+    }
+
+    to{
+        transform:translateY(-700px);
+        opacity:0;
+    }
+}
+</style>
+</head>
+<body>
+
+<div id="wall"></div>
+
+<div id="frozen-time">
+    HH.MM.SS
+</div>
+
+<div id="screen">
+
+    <div id="info">
+        [ : 감속<br>
+        ] : 가속
+    </div>
+
+    <div id="text-container">
+        <div id="text">
+            집에 가고 싶다
+        </div>
+    </div>
+
+</div>
+
+<div id="escape-meter">
+    <div id="escape-fill"></div>
+</div>
+
+<div id="escape-text">
+    탈출 욕구 : 1%
+</div>
+
+<script>
+
+const text = document.getElementById("text");
+const fill = document.getElementById("escape-fill");
+const escapeText = document.getElementById("escape-text");
+const wall = document.getElementById("wall");
+const frozenTime = document.getElementById("frozen-time");
+
+let angle = 0;
+let speed = 1;
+
+let lastHouse = 0;
+
+const houses = [
+    "🏠",
+    "🏡",
+    "🏘️"
+];
+
+const floatingTexts = [
+    "하교",
+    "주말",
+    "침대",
+    "게임",
+    "자유",
+    "집",
+    "학교 OUT",
+    "기숙사 OUT"
+];
+
+const wallWords = [
+    "집에 가고 싶다",
+    "하교",
+    "침대",
+    "주말",
+    "게임",
+    "자유"
+];
+
+let wallBuilt = false;
+let typed = "";
+let weekendMode = false;
+
+document.addEventListener("keydown",(e)=>{
+
+    if(e.key === "["){
+        speed = Math.max(0,speed - 1);
+    }
+
+    if(e.key === "]"){
+        speed += 1;
+    }
+
+    typed += e.key.toLowerCase();
+
+    if(typed.length > 5){
+        typed = typed.slice(-5);
+    }
+
+    if(typed.endsWith("wnakf")){
+        activateWeekend();
+    }
+
+    if(typed.endsWith("gkrry")){
+        activateSchool();
+    }
+
+});
+
+function spawnHouse(){
+
+    const item = document.createElement("div");
+
+    item.className = "house";
+
+    item.textContent =
+        speed >= 500
+        ? floatingTexts[
+            Math.floor(
+                Math.random() * floatingTexts.length
+            )
+        ]
+        : houses[
+            Math.floor(
+                Math.random() * houses.length
+            )
+        ];
+
+    item.style.left =
+        Math.random() * window.innerWidth + "px";
+
+    item.style.top =
+        window.innerHeight + "px";
+
+    item.style.fontSize =
+        (40 + Math.random() * 60) + "px";
+
+    document.body.appendChild(item);
+
+    setTimeout(()=>{
+        item.remove();
+    },8000);
+}
+
+function buildWall(){
+
+    let txt = "";
+
+    for(let y = 0; y < 60; y++){
+
+        for(let x = 0; x < 8; x++){
+
+            txt +=
+                wallWords[
+                    Math.floor(
+                        Math.random() * wallWords.length
+                    )
+                ] + "   ";
+        }
+
+        txt += "\n";
+    }
+
+    wall.textContent = txt;
+}
+
+function animate(){
+
+    if(weekendMode){
+
+        requestAnimationFrame(animate);
+        return;
+    }
+
+    text.textContent = "집에 가고 싶다";
+
+    angle += speed * 0.3;
+
+    let wobble = 0;
+
+    if(speed >= 700){
+
+        wobble =
+            Math.sin(angle / 20) * 10;
+    }
+
+    text.style.transform =
+        `rotate(${angle}deg)
+         translateY(${wobble}px)`;
+
+    text.style.fontSize =
+        `${90 + speed * 0.25}px`;
+
+    fill.style.width =
+        `${Math.min(speed,100)}%`;
+
+    if(speed >= 500){
+
+        escapeText.textContent =
+            `탈출 욕구 : ${speed}% (임계점 접근 중)`;
+    }
+    else{
+
+        escapeText.textContent =
+            `탈출 욕구 : ${speed}%`;
+    }
+
+    if(speed < 20){
+
+        text.style.color = "white";
+
+        text.style.textShadow =
+            "0 0 10px rgba(255,255,255,.4)";
+    }
+
+    else if(speed < 50){
+
+        text.style.color = "#ffd166";
+    }
+
+    else{
+
+        text.style.color = "#ffb347";
+
+        text.style.textShadow =
+            "0 0 25px rgba(255,179,71,.7)";
+    }
+
+    const spawnDelay =
+        speed >= 1000 ? 150 :
+        speed >= 500  ? 300 :
+        speed >= 200  ? 700 :
+                        1200;
+
+    if(
+        speed >= 50 &&
+        Date.now() - lastHouse > spawnDelay
+    ){
+        spawnHouse();
+        lastHouse = Date.now();
+    }
+
+    if(speed >= 100){
+
+        if(!wallBuilt){
+
+            buildWall();
+            wallBuilt = true;
+        }
+
+        wall.style.opacity =
+            Math.min(
+                0.05 + speed / 3000,
+                1
+            );
+
+        document.body.style.background =
+        `radial-gradient(
+            circle at center,
+            hsl(${30 + (angle % 30)},70%,20%),
+            #090b12
+        )`;
+    }
+    else{
+
+        wall.style.opacity = 0;
+
+        document.body.style.background =
+        `radial-gradient(
+            circle at center,
+            #1a2030,
+            #090b12
+        )`;
+    }
+
+    if(speed >= 300){
+
+        var today = new Date();   
+
+        var hours = ('0' + today.getHours()).slice(-2); 
+        var minutes = ('0' + today.getMinutes()).slice(-2);
+        var seconds = ('0' + today.getSeconds()).slice(-2); 
+
+        var timeString = hours + ':' + minutes  + ':' + seconds;
+
+        frozenTime.textContent = timeString;
+
+        frozenTime.style.opacity = 1;
+    }
+    else{
+
+        frozenTime.style.opacity = 0;
+    }
+
+    if(speed >= 2000){
+
+        wall.style.opacity = 0.4;
+
+        wall.textContent =
+            ("집 ".repeat(100) + "\n")
+            .repeat(80);
+
+        // 2000 -> 0
+        // 3000 -> 1
+        const progress = Math.min(
+            (speed - 2000) / 1000,
+            1
+        );
+
+        // 흰색(채도 0) → 빨간색(채도 100)
+        wall.style.color =
+            `hsl(0, ${progress * 100}%, 50%)`;
+
+        wall.style.textShadow =
+            `0 0 ${10 + progress * 20}px
+            rgba(255,0,0,${0.2 + progress * 0.6})`;
+    }
+
+    if(speed < 2000){
+
+        wall.style.color =
+            "rgba(255,255,255,.5)";
+
+        wall.style.textShadow =
+            `
+            0 0 10px rgba(255,255,255,.5),
+            0 0 20px rgba(255,255,255,.5)
+            `;
+    }
+
+    requestAnimationFrame(animate);
+}
+
+function firework(x, y){
+
+    for(let i = 0; i < 40; i++){
+
+        const p = document.createElement("div");
+
+        p.style.position = "fixed";
+        p.style.left = x + "px";
+        p.style.top = y + "px";
+        p.style.width = "8px";
+        p.style.height = "8px";
+        p.style.borderRadius = "50%";
+
+        p.style.background =
+            `hsl(${Math.random()*360}deg 100% 60%)`;
+
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 50 + Math.random() * 200;
+
+        p.animate(
+            [
+                {
+                    transform:"translate(0,0)",
+                    opacity:1
+                },
+                {
+                    transform:
+                    `translate(
+                        ${Math.cos(angle)*distance}px,
+                        ${Math.sin(angle)*distance}px
+                    )`,
+                    opacity:0
+                }
+            ],
+            {
+                duration:1500,
+                easing:"ease-out"
+            }
+        );
+
+        document.body.appendChild(p);
+
+        setTimeout(()=>{
+            p.remove();
+        },1500);
+    }
+}
+
+function activateWeekend(){
+
+    if(weekendMode) return;
+
+    weekendMode = true;
+
+    speed = 0;
+
+    text.textContent = "🎉 주말이다! 🎉";
+
+    text.style.color = "white";
+
+    text.style.textShadow =
+        "0 0 10px rgba(255,255,255,.4)";
+
+    text.style.transform =
+        `rotate(0deg)
+         translateY(0px)`;
+
+    text.style.fontSize =
+        `90px`;
+
+    fill.style.width = "0%";
+
+    escapeText.textContent =
+        "탈출 욕구 : 0%";
+
+    document.body.style.background =
+        "linear-gradient(180deg,#87CEEB,#B0E0E6,#FFFFFF)";
+
+    wall.style.opacity = 0;
+    frozenTime.style.opacity = 0;
+
+    for(let i = 0; i < 8; i++){
+
+        setTimeout(()=>{
+
+            firework(
+                Math.random()*window.innerWidth,
+                Math.random()*window.innerHeight*0.6
+            );
+
+        }, i * 300);
+    }
+}
+
+function activateSchool(){
+
+    if(!weekendMode) return;
+
+    text.textContent = "학교다...";
+
+    document.body.style.background =
+        `radial-gradient(
+            circle at center,
+            #1a2030,
+            #090b12
+        )`;
+
+    wall.style.opacity = 0;
+    frozenTime.style.opacity = 0;
+
+    setTimeout(()=>{
+
+        text.textContent =
+            "...";
+
+    },2000);
+
+    setTimeout(()=>{
+
+        weekendMode = false;
+
+        speed = 1;
+
+        typed = "";
+
+        text.textContent =
+            "집에 가고 싶다";
+
+        wallBuilt = false;
+
+    },4000);
+}
+
+animate();
+
+</script>
+
+</body>
+</html>
+```
